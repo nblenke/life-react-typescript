@@ -142,7 +142,6 @@ const App: FunctionComponent = () => {
   const handleResetClick = () => {
     setPaused(false)
     setGameStarted(false)
-    // setRandomLiving(cells, true)
     cells = setRandomLiving(cells, true)
     setCells(cells)
     stopTick()
