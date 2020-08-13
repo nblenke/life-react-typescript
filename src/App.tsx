@@ -93,19 +93,14 @@ const updateCells = (cells: any) =>
     }
   })
 
-const setRandomLiving = (cells: any, killAll: boolean) =>
-  cells.map((cell: any) => {
-    return {
-      id: cell.id,
-      living: killAll ? false : Math.round(Math.random()) === 1,
-    }
-  })
-
 const App: FunctionComponent = () => {
   const [, updateState] = useState()
   const forceUpdate = useCallback(() => updateState({}), [])
   let [cells, setCells] = useState<CellInterface[]>([])
   const [paused, setPaused] = useState(false)
+  const [userInteractionBeforeStart, setUserInteractionBeforeStart] = useState(
+    false
+  )
   const [gameStarted, setGameStarted] = useState(false)
   const AppContextValue = useMemo(() => ({cells, setCells}), [cells])
 
@@ -134,20 +129,41 @@ const App: FunctionComponent = () => {
 
   const handleStartClick = () => {
     setGameStarted(true)
-    cells = setRandomLiving(cells, false)
-    setCells(cells)
     startTick()
+
+    if (userInteractionBeforeStart) {
+      return
+    }
+
+    cells = cells.map(({id}) => {
+      return {
+        id,
+        living: Math.round(Math.random()) === 1,
+      }
+    })
+    setCells(cells)
   }
 
   const handleResetClick = () => {
+    setUserInteractionBeforeStart(false)
     setPaused(false)
     setGameStarted(false)
-    cells = setRandomLiving(cells, true)
-    setCells(cells)
     stopTick()
+
+    cells = cells.map(({id}) => {
+      return {
+        id,
+        living: false,
+      }
+    })
+    setCells(cells)
   }
 
   const handleCellClick = (id: any) => {
+    if (!gameStarted) {
+      setUserInteractionBeforeStart(true)
+    }
+
     cells[id].living = !cells[id].living
     setCells(cells)
     forceUpdate()
