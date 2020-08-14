@@ -4,6 +4,7 @@ import React, {
   FunctionComponent,
   useCallback,
   useEffect,
+  useRef,
   useState,
   useMemo,
 } from 'react'
@@ -24,23 +25,28 @@ export const AppContext = createContext<IUserInterfaceContext>({
   setCells: function () {},
 })
 
-let tick: any
-
-const updateCells = (cells: any) =>
-  cells.map((cell: any) => {
+const updateCells = (cells: CellInterface[]): CellInterface[] =>
+  cells.map((cell: CellInterface) => {
     const {id} = cell
     const rowLength = 20
-    const top = cells[id - rowLength]
-    const topLeft = cells[id - rowLength - 1]
-    const topRight = cells[id - rowLength + 1]
-    const left = cells[id - 1]
-    const bottom = cells[id + rowLength]
-    const bottomLeft = cells[id + rowLength - 1]
-    const bottomRight = cells[id + rowLength + 1]
-    const right = cells[id + 1]
+    const height = cells.length / rowLength
+    const curCol = id % rowLength
+    const curRow = Math.floor(id / rowLength)
+    const prevCol = (curCol + rowLength - 1) % rowLength
+    const nextCol = (curCol + rowLength + 1) % rowLength
+    const prevRow = curRow === 0 ? height - 1 : curRow - 1
+    const nextRow = curRow === height - 1 ? 0 : curRow + 1
+    const top = cells[prevRow * rowLength + curCol]
+    const topLeft = cells[prevRow * rowLength + prevCol]
+    const topRight = cells[prevRow * rowLength + nextCol]
+    const left = cells[curRow * rowLength + prevCol]
+    const bottom = cells[nextRow * rowLength + curCol]
+    const bottomLeft = cells[nextRow * rowLength + prevCol]
+    const bottomRight = cells[nextRow * rowLength + nextCol]
+    const right = cells[curRow * rowLength + nextCol]
 
     let neighborLength = 0
-    let living
+    let living = cell.living
 
     if (top && top.living) {
       neighborLength += 1
@@ -94,15 +100,16 @@ const updateCells = (cells: any) =>
   })
 
 const App: FunctionComponent = () => {
-  const [, updateState] = useState()
-  const forceUpdate = useCallback(() => updateState({}), [])
-  let [cells, setCells] = useState<CellInterface[]>([])
+  const [cells, setCells] = useState<CellInterface[]>([])
   const [paused, setPaused] = useState(false)
   const [userInteractionBeforeStart, setUserInteractionBeforeStart] = useState(
     false
   )
   const [gameStarted, setGameStarted] = useState(false)
   const AppContextValue = useMemo(() => ({cells, setCells}), [cells])
+  const cellRef = useRef(cells)
+  const intervalRef = useRef<number>()
+  const speed = 1000
 
   useEffect(() => {
     const arr = []
@@ -116,18 +123,20 @@ const App: FunctionComponent = () => {
     setCells(arr)
   }, [])
 
-  const startTick = () => {
-    tick = setInterval(() => {
-      cells = updateCells(cells)
-      setCells(cells)
-    }, 1000)
-  }
+  const startTick = useCallback(() => {
+    const id = window.setInterval(() => {
+      cellRef.current = updateCells(cellRef.current)
+      setCells(cellRef.current)
+    }, speed)
 
-  const stopTick = () => {
-    clearInterval(tick)
-  }
+    intervalRef.current = id
+  }, [speed])
 
-  const handleStartClick = () => {
+  const stopTick = useCallback(() => {
+    window.clearInterval(intervalRef.current)
+  }, [intervalRef])
+
+  const handleStartClick = useCallback(() => {
     setGameStarted(true)
     startTick()
 
@@ -135,41 +144,53 @@ const App: FunctionComponent = () => {
       return
     }
 
-    cells = cells.map(({id}) => {
+    cellRef.current = cells.map(({id}) => {
       return {
         id,
         living: Math.round(Math.random()) === 1,
       }
     })
-    setCells(cells)
-  }
+    setCells(cellRef.current)
+  }, [cells])
 
-  const handleResetClick = () => {
+  const handleResetClick = useCallback(() => {
     setUserInteractionBeforeStart(false)
     setPaused(false)
     setGameStarted(false)
     stopTick()
 
-    cells = cells.map(({id}) => {
+    cellRef.current = cells.map(({id}) => {
       return {
         id,
         living: false,
       }
     })
-    setCells(cells)
-  }
+    setCells(cellRef.current)
+  }, [cells])
 
-  const handleCellClick = (id: any) => {
-    if (!gameStarted) {
-      setUserInteractionBeforeStart(true)
-    }
+  const handleCellClick = useCallback(
+    (ev: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+      const button = ev.target as HTMLButtonElement
+      const idString = button.dataset.cellId
 
-    cells[id].living = !cells[id].living
-    setCells(cells)
-    forceUpdate()
-  }
+      if (idString === undefined) {
+        return
+      }
 
-  const handlePlayClick = () => {
+      const id = Number.parseInt(idString)
+
+      if (!gameStarted) {
+        setUserInteractionBeforeStart(true)
+      }
+
+      const newCells = [...cells]
+      newCells[id].living = !newCells[id].living
+      setCells(newCells)
+    },
+    [cells, gameStarted]
+  )
+
+  const handlePlayClick = useCallback(() => {
     setPaused(!paused)
 
     if (paused) {
@@ -177,7 +198,7 @@ const App: FunctionComponent = () => {
     } else {
       stopTick()
     }
-  }
+  }, [paused])
 
   return (
     <AppContext.Provider value={AppContextValue}>
@@ -205,9 +226,10 @@ const App: FunctionComponent = () => {
           <div className="board">
             {cells.map(({id, living}) => (
               <button
+                data-cell-id={id}
                 className={`cell ${living ? 'living' : ''}`}
                 key={`cell-${id}`}
-                onClick={() => handleCellClick(id)}
+                onClick={handleCellClick}
               >
                 {id}
                 <div className="cell-inner" />
