@@ -109,7 +109,7 @@ const App: FunctionComponent = () => {
   const AppContextValue = useMemo(() => ({cells, setCells}), [cells])
   const cellRef = useRef(cells)
   const intervalRef = useRef<number>()
-  const speed = 1000
+  const [speed, setSpeed] = useState(1000)
 
   useEffect(() => {
     const arr = []
@@ -200,6 +200,20 @@ const App: FunctionComponent = () => {
     }
   }, [paused])
 
+  const handleFasterClick = useCallback(() => {
+    const newSpeed = speed / 2
+    stopTick()
+    setSpeed(newSpeed)
+    startTick()
+  }, [speed, startTick, stopTick])
+
+  const handleSlowerClick = useCallback(() => {
+    const newSpeed = speed * 2
+    stopTick()
+    setSpeed(newSpeed)
+    startTick()
+  }, [speed, startTick, stopTick])
+
   return (
     <AppContext.Provider value={AppContextValue}>
       <div className="app">
@@ -217,6 +231,13 @@ const App: FunctionComponent = () => {
               </button>
               <button className="button" onClick={handlePlayClick}>
                 {paused ? 'Resume' : 'Pause'}
+              </button>
+              <div className="action-label">Speed: {speed}</div>
+              <button className="button" onClick={handleSlowerClick}>
+                Slower
+              </button>
+              <button className="button" onClick={handleFasterClick}>
+                Faster
               </button>
             </Fragment>
           )}
